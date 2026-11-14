@@ -4,9 +4,9 @@
   "display": "standalone",
   "name": "Ohanami",
   "orientation": "portrait",
-  "scope": "/index.html",
+  "scope": "./",
   "short_name": "Ohanami",
-  "start_url": "/index.html",
+  "start_url": "./",
   "theme_color": "#ffffff",
   "description": "Ohanami card game app",
   "lang": "en",
@@ -18,7 +18,7 @@
       "src": "/12431323.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any"
+      "purpose": "any maskable"
     }
   ]
 }
