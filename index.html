@@ -1,0 +1,1359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Ohanami Web - Grandmaster Lookahead & Heatmap Scorecard</title>  
+
+  <!-- Web App Manifest -->
+<link rel="manifest" href="manifest.json">
+
+<style>
+    * { box-sizing: border-box; }
+    body { 
+        font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        background: #121212; color: #e0e0e0; margin: 0; padding: 5px;
+        min-height: 100dvh; display: flex; flex-direction: column; 
+        overflow-x: hidden; overflow-y: auto; 
+    }
+    
+    h1, h2, h3, h4 { margin: 4px 0; text-align: center; color: #fff; }
+    button { padding: 6px 12px; margin: 2px; cursor: pointer; border: none; border-radius: 4px; background: #d64550; color: white; font-weight: bold; font-size: 13px; transition: background 0.2s; }
+    button:disabled { background: #444; color: #888; cursor: not-allowed; }
+
+    /* Screens & Modals */
+    .screen { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; text-align: center; width: 100%; max-width: 600px; margin: auto; }
+    .hidden { display: none !important; }
+    .btn-group { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 10px 0; }
+    
+    .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; display: flex; flex-direction: column; justify-content: center; align-items: center; padding: 10px; }
+    .modal-content { background: #1e1e1e; color: #e0e0e0; padding: 12px; border-radius: 8px; width: 100%; max-width: 480px; max-height: 95vh; overflow-y: auto; display: flex; flex-direction: column; box-shadow: 0 4px 20px rgba(0,0,0,0.6); }
+
+    .modal-tabs { display: flex; justify-content: space-around; background: #2c2c2c; border-radius: 6px; padding: 3px; margin-bottom: 10px; }
+    .tab-btn { flex: 1; background: transparent; color: #aaa; padding: 6px; font-size: 12px; border-radius: 4px; margin: 0 2px; }
+    .tab-btn.active { background: #d64550; color: white; }
+
+    /* AI Setup Panel */
+    .ai-config-box { background: #1e1e1e; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); width: 100%; margin-bottom: 10px; text-align: left; font-size: 13px; border: 1px solid #333; }
+    .ai-slot { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; background: #252525; padding: 6px; border-radius: 5px; border: 1px solid #383838; }
+    .ai-slot select { padding: 4px; border-radius: 4px; border: 1px solid #555; background: #121212; color: #fff; font-size: 12px; }
+
+    /* Game Screen */
+    #game-screen { flex: 1; display: flex; flex-direction: column; gap: 5px; max-width: 1200px; margin: auto; width: 100%; }
+    .status-bar { flex: 0 0 auto; display: flex; justify-content: space-between; align-items: center; background: #1e1e1e; padding: 6px 10px; border-radius: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); font-size: 13px; border: 1px solid #333;}
+    
+    .opponents-area { flex: 1 1 auto; display: flex; justify-content: space-around; gap: 5px; min-height: 120px; }
+    .player-board { flex: 1.2 1 auto; background: #1e1e1e; border-radius: 6px; padding: 4px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); display: flex; flex-direction: column; align-items: center; min-width: 0; width: 100%; min-height: 170px; border: 1px solid #333; }
+    .main-player { border: 2px solid #d64550; justify-content: space-between; }
+    
+    .columns-container { display: flex; justify-content: center; gap: 4px; width: 100%; flex: 1; }
+    .column { flex: 1; background: #2a2a2a; border: 1px dashed #444; border-radius: 4px; display: flex; flex-direction: column; align-items: center; justify-content: space-between; padding: 4px 0; position: relative; }
+    .column.active-target { background: #113f48; border-color: #00bcd4; cursor: pointer; box-shadow: 0 0 5px #00bcd4; }
+    
+    .color-summary { display: flex; gap: 3px; margin-bottom: 3px; }
+    .summary-pill { padding: 1px 5px; border-radius: 10px; font-size: 10px; font-weight: bold; color: white; text-shadow: 0 1px 1px rgba(0,0,0,0.6); }
+
+    .card { border-radius: 4px; display: flex; justify-content: center; align-items: center; font-weight: bold; color: white; box-shadow: 0 1px 2px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.3); user-select: none; }
+    .card-stack { position: relative; width: 100%; display: flex; justify-content: center; }
+    
+    .action-area { flex: 0 0 auto; text-align: center; background: #1e1e1e; border-radius: 6px; padding: 6px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); border: 1px solid #333; }
+    #instruction-text { font-size: 13px; margin: 2px 0; }
+    
+    .hand-area { flex: 0 0 auto; display: flex; justify-content: center; flex-wrap: wrap; gap: 5px; padding: 8px; background: #1e1e1e; border-radius: 6px; min-height: 70px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); border: 1px solid #333; }
+    .card.in-hand { width: 40px; height: 58px; font-size: 16px; cursor: pointer; transition: transform 0.2s;}
+    .card.in-hand.selected { outline: 3px solid #ffd700; transform: translateY(-6px); z-index: 10; filter: brightness(1.1);}
+
+    .color-blue, .bg-blue { background: #258FE8; }   
+    .color-green, .bg-green { background: #43A854; }  
+    .color-gray, .bg-gray { background: #858C98; }   
+    .color-pink, .bg-pink { background: #E84380; }   
+
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-bottom: 10px; }
+    .stat-card { background: #252525; padding: 8px; border-radius: 6px; text-align: center; border: 1px solid #333; }
+    .stat-card .val { font-size: 18px; font-weight: bold; color: #d64550; }
+    .stat-card .lbl { font-size: 11px; color: #aaa; }
+
+    .lab-config { background: #1e1e1e; padding: 10px; border-radius: 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.3); width: 100%; margin-bottom: 10px; text-align: left; font-size: 13px; border: 1px solid #333; }
+    .lab-config label { display: block; margin-top: 5px; font-weight: bold; }
+    .lab-config input { width: 100%; padding: 4px; background: #121212; color: #fff; border: 1px solid #444; border-radius: 4px; }
+
+    /* --- RESPONSIVE HEATMAP SCORECARD STYLES --- */
+    .sc-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .sc-title { font-size: 16px; font-weight: bold; color: #fff; margin: 0; }
+    .sc-badge-final { background: #1b5e20; color: #81c784; font-size: 11px; font-weight: bold; padding: 2px 8px; border-radius: 12px; border: 1px solid #2e7d32; }
+    
+    .sc-controls { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; color: #aaa; }
+    .toggle-switch { position: relative; display: inline-block; width: 34px; height: 18px; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-slider { position: absolute; cursor: pointer; inset: 0; background-color: #444; transition: .2s; border-radius: 18px; }
+    .toggle-slider:before { position: absolute; content: ""; height: 12px; width: 12px; left: 3px; bottom: 3px; background-color: white; transition: .2s; border-radius: 50%; }
+    input:checked + .toggle-slider { background-color: #258FE8; }
+    input:checked + .toggle-slider:before { transform: translateX(16px); }
+
+    .sc-grid-table { display: grid; gap: 4px; align-items: center; margin-bottom: 12px; font-size: 11px; width: 100%; }
+    .sc-col-header { text-align: center; font-weight: bold; color: #aaa; font-size: 10px; padding-bottom: 2px; }
+    .sc-round-title { display: flex; justify-content: space-between; align-items: center; font-weight: bold; color: #fff; font-size: 12px; margin-top: 10px; margin-bottom: 4px; border-bottom: 1px solid #333; padding-bottom: 2px; }
+    .sc-round-subtitle { font-size: 10px; color: #888; font-weight: normal; }
+
+    .sc-row-label { display: flex; align-items: center; gap: 6px; font-weight: 500; font-size: 11px; color: #ddd; height: 45px; }
+    .sc-color-bar { width: 5px; height: 32px; border-radius: 2px; flex-shrink: 0; }
+
+    .sc-cell { height: 45px; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; font-variant-numeric: tabular-nums; gap: 1px; padding: 2px; width: 100%; }
+    .sc-cell-count { font-size: 15px; font-weight: 600; line-height: 1.1; }
+    .sc-cell-pts { font-size: 10px; line-height: 1.1; opacity: 0.9; }
+
+    /* Theme-matched Cell Styles */
+    .cell-blue-active { background: #258FE8; color: #ffffff; }
+    .cell-blue-inactive { background: #14283c; color: #6ba6e8; border: 1px solid #204060; }
+    .cell-green-active { background: #43A854; color: #ffffff; }
+    .cell-green-inactive { background: #19331e; color: #78ce85; border: 1px solid #264d2d; }
+    .cell-gray-active { background: #858C98; color: #ffffff; }
+    .cell-gray-inactive { background: #282b30; color: #a6abb4; border: 1px solid #3d4249; }
+    .cell-pink-active { background: #E84380; color: #ffffff; }
+    .cell-pink-inactive { background: #3b1725; color: #f28ab0; border: 1px solid #5a2438; }
+
+    .bar-blue-active { background: #258FE8; } .bar-blue-inactive { background: #14283c; }
+    .bar-green-active { background: #43A854; } .bar-green-inactive { background: #19331e; }
+    .bar-gray-active { background: #858C98; } .bar-gray-inactive { background: #282b30; }
+    .bar-pink-active { background: #E84380; } .bar-pink-inactive { background: #3b1725; }
+
+    .sc-round-total-row { background: #252525; border-radius: 6px; display: grid; align-items: center; height: 38px; padding: 0 4px; margin-top: 4px; margin-bottom: 8px; border: 1px solid #333; width: 100%; }
+    .sc-round-total-label { font-size: 9px; font-weight: bold; color: #aaa; text-align: center; line-height: 1.1; }
+    .sc-round-total-val { text-align: center; font-variant-numeric: tabular-nums; font-size: 12px; }
+    .sc-rt-score { font-weight: bold; color: #fff; }
+    .sc-rt-cumul { font-size: 10px; color: #888; margin-left: 2px; }
+
+    .sc-final-panel { background: #1a1a1a; border: 1px solid #333; border-radius: 8px; padding: 10px; margin-top: 12px; margin-bottom: 6px; }
+    .sc-final-header { display: flex; justify-content: space-between; align-items: center; font-weight: bold; font-size: 13px; color: #fff; margin-bottom: 8px; border-bottom: 1px solid #333; padding-bottom: 4px; }
+    .sc-final-grid { display: grid; gap: 4px; text-align: center; }
+    .sc-final-col { background: #242424; border-radius: 6px; padding: 6px 2px; border: 1px solid #333; display: flex; flex-direction: column; justify-content: space-between; min-height: 72px; width: 100%; }
+    .sc-final-name { font-size: 10px; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sc-final-score { font-size: 20px; font-weight: bold; color: #fff; font-variant-numeric: tabular-nums; margin: 2px 0; }
+    .sc-final-rank { font-size: 10px; font-weight: bold; color: #888; }
+    .sc-final-rank.winner { color: #ffd700; }
+
+    .history-item { background: #252525; border: 1px solid #333; border-radius: 6px; padding: 8px 10px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: center; cursor: pointer; transition: background 0.2s; font-size: 12px; }
+    .history-item:hover { background: #2f2f2f; border-color: #d64550; }
+</style>
+</head>
+<body>
+
+<!-- SETUP SCREEN -->
+<div id="setup-screen" class="screen">
+    <h1>🌸 Ohanami Web 🌸</h1>
+    <p style="color:#aaa;">Configure match opponents and difficulty:</p>
+    
+    <div class="ai-config-box">
+        <label>Number of Opponents: <span id="num-opps-val">1</span></label>
+        <input type="range" id="num-opps-slider" min="1" max="3" value="1" oninput="updateOpponentSlots(this.value)">
+        
+        <div id="opponent-slots-container" style="margin-top: 8px;"></div>
+
+        <div style="margin-top: 8px; padding-top: 6px; border-top: 1px solid #333;">
+            <label style="font-size:12px; color:#aaa; cursor:pointer; display:flex; align-items:center; justify-content:space-between;">
+                <span>📁 Upload Custom Grandmaster AI (.json):</span>
+                <input type="file" id="dna-file-input" accept=".json" onchange="loadCustomAIDNA(event)">
+            </label>
+            <div id="loaded-dna-status" style="font-size:11px; color:#2196F3; margin-top:2px;">No custom AI loaded yet.</div>
+        </div>
+    </div>
+
+    <div class="btn-group">
+        <button onclick="startGame()" style="background:#4CAF50; padding: 10px 20px; font-size:15px;">Start Match</button>
+    </div>
+    <div class="btn-group">
+        <button onclick="openModal('stats')" style="background:#444;">View Lifetime Stats & History</button>
+        <button onclick="showScreen('lab-screen')" style="background:#2196F3;">🧬 Open Grandmaster AI Lab</button>
+    </div>
+</div>
+
+<!-- AI LAB SCREEN -->
+<div id="lab-screen" class="screen hidden">
+    <h1>🧬 Grandmaster Pair-Synergy Lab</h1>
+    <p style="font-size:13px; color:#aaa;">Evolving 2-card lookahead, gap discipline, and deliberate card discarding.</p>
+    
+    <div class="lab-config">
+        <label>Population Size: <span id="pop-val">50</span></label>
+        <input type="range" id="pop-slider" min="20" max="100" step="10" value="50" oninput="document.getElementById('pop-val').innerText=this.value">
+        
+        <label>Mutation Rate: <span id="mut-val">15</span>%</label>
+        <input type="range" id="mut-slider" min="1" max="50" value="15" oninput="document.getElementById('mut-val').innerText=this.value">
+    </div>
+
+    <div style="background: #1e1e1e; padding: 12px; border-radius: 8px; width: 100%; box-shadow: 0 2px 4px rgba(0,0,0,0.3); margin-bottom: 10px; border: 1px solid #333;">
+        <h3>Live Simulation Feed</h3>
+        <div class="stats-grid">
+            <div class="stat-card"><div class="val" id="lab-gen">0</div><div class="lbl">Generation</div></div>
+            <div class="stat-card"><div class="val" id="lab-best">0</div><div class="lbl">Best Single-Game Score</div></div>
+            <div class="stat-card"><div class="val" id="lab-avg">0</div><div class="lbl">Gen Avg Fitness</div></div>
+            <div class="stat-card"><div class="val" id="lab-top-win">0%</div><div class="lbl">Tournament Win Rate</div></div>
+        </div>
+    </div>
+
+    <div class="btn-group">
+        <button id="lab-start-btn" onclick="startSimulation()" style="background:#4CAF50;">Start Simulation</button>
+        <button id="lab-pause-btn" onclick="pauseSimulation()" style="background:#ff9800;" disabled>Pause</button>
+        <button onclick="exportBestAI()" style="background:#2196F3;">Export Grandmaster AI (.json)</button>
+        <button onclick="showScreen('setup-screen')" style="background:#444;">Back to Setup</button>
+    </div>
+</div>
+
+<!-- GAME SCREEN -->
+<div id="game-screen" class="hidden">
+    <div class="status-bar">
+        <div>
+            <b>R:</b> <span id="round-indicator">1/3</span> | 
+            <b>T:</b> <span id="turn-indicator">1/5</span>
+        </div>
+        <div id="score-board"></div>
+        <button onclick="openModal('scorecard')">Scores & Stats</button>
+    </div>
+
+    <div class="opponents-area" id="opponents-area"></div>
+
+    <div class="player-board main-player">
+        <div>
+            <h4 style="font-size:13px;">Your Gardens</h4>
+            <div class="color-summary" id="summary-0"></div>
+        </div>
+        <div class="columns-container" id="player-cols">
+            <div class="column" id="col-0" onclick="placeCardInColumn(0)"></div>
+            <div class="column" id="col-1" onclick="placeCardInColumn(1)"></div>
+            <div class="column" id="col-2" onclick="placeCardInColumn(2)"></div>
+        </div>
+    </div>
+
+    <div class="action-area" id="action-area">
+        <h4 id="instruction-text">Select 2 cards to draft</h4>
+        <button id="action-btn" onclick="confirmDraft()" disabled>Confirm Draft</button>
+        <button id="discard-btn" onclick="discardCard()" class="hidden" style="background:#555;">Discard Card</button>
+    </div>
+    <div class="hand-area" id="hand-area"></div>
+</div>
+
+<!-- UNIFIED MODAL -->
+<div id="app-modal" class="modal hidden">
+    <div class="modal-content">
+        <div class="modal-tabs">
+            <button id="tab-scorecard-btn" class="tab-btn" onclick="switchTab('scorecard')">Scorecard</button>
+            <button id="tab-stats-btn" class="tab-btn" onclick="switchTab('stats')">Statistics</button>
+            <button id="tab-history-btn" class="tab-btn" onclick="switchTab('history')">History</button>
+        </div>
+
+        <div id="tab-scorecard" class="tab-content">
+            <div id="scorecard-content"></div>
+        </div>
+
+        <div id="tab-stats" class="tab-content hidden">
+            <h3 style="margin-top:0;">Lifetime Statistics</h3>
+            <div id="stats-content"></div>
+        </div>
+
+        <div id="tab-history" class="tab-content hidden">
+            <h3 style="margin-top:0;">Match History</h3>
+            <div id="history-content"></div>
+            <div style="display:flex; justify-content:center; gap:8px; margin-top: 10px;">
+                <button onclick="exportHistoryJSON()" style="background:#2196F3; font-size:11px;">Export History (JSON)</button>
+                <button onclick="clearHistory()" style="background:#555; font-size:11px;">Clear History</button>
+            </div>
+        </div>
+
+        <div style="text-align:center; margin-top:12px;">
+            <button onclick="closeModal()">Close</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    /* --- DEEP LOOKAHEAD & PAIR-SYNERGY AI ENGINE --- */
+    const COLORS = ['blue', 'green', 'gray', 'pink'];
+    let deck = [], players = [], currentRound = 1, currentTurn = 1;
+    let selectedDrafts = [], cardsToPlace = [], activePlaceCardIndex = 0;
+    let uploadedCustomDna = null;
+    let viewingHistoricalGame = null;
+
+    const AI_PERSONAS = {
+        easy: { name: "Easy", label: "EASY", dna: { blueVal: 3, greenVal: 3, grayVal: 3, pinkVal: 3, round1Focus: 1.5, round2Focus: 1.5, round3Focus: 1.5, gapDiscipline: 1, columnBalancing: 1, denialWeight: 1, discardWillpower: 0.5 } },
+        medium: { name: "Medium", label: "MED", dna: { blueVal: 6, greenVal: 7, grayVal: 9, pinkVal: 10, round1Focus: 3, round2Focus: 4, round3Focus: 7, gapDiscipline: 6, columnBalancing: 4, denialWeight: 5, discardWillpower: 3 } },
+        hard: { name: "Hard", label: "GM", dna: { blueVal: 9, greenVal: 11, grayVal: 16, pinkVal: 18, round1Focus: 4.5, round2Focus: 6, round3Focus: 12, gapDiscipline: 14, columnBalancing: 7, denialWeight: 11, discardWillpower: 8 } },
+        custom: { name: "Custom", label: "CUST", dna: null }
+    };
+
+    function createComplexDNA() {
+        return {
+            blueVal: Math.random() * 12 + 2,
+            greenVal: Math.random() * 12 + 2,
+            grayVal: Math.random() * 18 + 4,
+            pinkVal: Math.random() * 18 + 4,
+            round1Focus: Math.random() * 6 + 1,
+            round2Focus: Math.random() * 8 + 2,
+            round3Focus: Math.random() * 14 + 4,
+            gapDiscipline: Math.random() * 16 + 4,
+            columnBalancing: Math.random() * 10,
+            denialWeight: Math.random() * 15 + 2,
+            discardWillpower: Math.random() * 10 + 2
+        };
+    }
+
+    function mutateDNA(dna, rate) {
+        let mut = () => (Math.random() - 0.5) * 2 * (rate / 100);
+        let clamp = (val, min, max) => Math.max(min, Math.min(max, val + mut() * max));
+        return {
+            blueVal: clamp(dna.blueVal, 1, 20),
+            greenVal: clamp(dna.greenVal, 1, 20),
+            grayVal: clamp(dna.grayVal, 1, 25),
+            pinkVal: clamp(dna.pinkVal, 1, 25),
+            round1Focus: clamp(dna.round1Focus, 1, 15),
+            round2Focus: clamp(dna.round2Focus, 1, 15),
+            round3Focus: clamp(dna.round3Focus, 1, 20),
+            gapDiscipline: clamp(dna.gapDiscipline, 1, 25),
+            columnBalancing: clamp(dna.columnBalancing, 0, 15),
+            denialWeight: clamp(dna.denialWeight, 0, 25),
+            discardWillpower: clamp(dna.discardWillpower, 0, 15)
+        };
+    }
+
+    function crossoverDNA(dna1, dna2) {
+        let pick = (k) => Math.random() > 0.5 ? dna1[k] : dna2[k];
+        return {
+            blueVal: pick('blueVal'), greenVal: pick('greenVal'),
+            grayVal: pick('grayVal'), pinkVal: pick('pinkVal'),
+            round1Focus: pick('round1Focus'), round2Focus: pick('round2Focus'),
+            round3Focus: pick('round3Focus'), gapDiscipline: pick('gapDiscipline'),
+            columnBalancing: pick('columnBalancing'), denialWeight: pick('denialWeight'),
+            discardWillpower: pick('discardWillpower')
+        };
+    }
+
+    function calculateRemainingPlayableSpace(cols) {
+        let playableCount = 0;
+        for (let id = 1; id <= 120; id++) {
+            for (let c = 0; c < 3; c++) {
+                if (cols[c].length === 0) { playableCount++; break; }
+                let min = Math.min(cols[c][0].id, cols[c][cols[c].length - 1].id);
+                let max = Math.max(cols[c][0].id, cols[c][cols[c].length - 1].id);
+                if (id < min || id > max) { playableCount++; break; }
+            }
+        }
+        return playableCount;
+    }
+
+    function simulateCardPlacement(cols, card, roundNum, dna) {
+        let bestOption = null;
+        let bestScore = -9999;
+        let turnsLeft = ((3 - roundNum) * 5) + (6 - currentTurn);
+        let idealMaxGap = Math.max(4, Math.floor(45 / Math.max(1, turnsLeft * 0.6)));
+
+        for (let c = 0; c < 3; c++) {
+            let col = cols[c];
+            let canPlace = false;
+            let gap = 0;
+            let placeBottom = false;
+
+            if (col.length === 0) {
+                canPlace = true;
+                gap = Math.abs(60 - card.id) * 0.4;
+            } else {
+                let min = Math.min(col[0].id, col[col.length - 1].id);
+                let max = Math.max(col[0].id, col[col.length - 1].id);
+                if (card.id > max) { canPlace = true; gap = card.id - max; placeBottom = false; }
+                else if (card.id < min) { canPlace = true; gap = min - card.id; placeBottom = true; }
+            }
+
+            if (canPlace) {
+                let moveScore = 0;
+                if (gap > idealMaxGap) {
+                    moveScore -= (gap - idealMaxGap) * (dna.gapDiscipline * 0.45);
+                } else {
+                    moveScore += (idealMaxGap - gap) * 0.5;
+                }
+
+                let avgLen = (cols[0].length + cols[1].length + cols[2].length) / 3;
+                if (col.length <= avgLen) moveScore += dna.columnBalancing * 1.5;
+
+                if (moveScore > bestScore) {
+                    bestScore = moveScore;
+                    let clonedCols = cols.map(arr => [...arr]);
+                    if (clonedCols[c].length === 0 || !placeBottom) clonedCols[c].push(card);
+                    else clonedCols[c].unshift(card);
+                    bestOption = { valid: true, newCols: clonedCols, placementQuality: moveScore };
+                }
+            }
+        }
+        return bestOption || { valid: false, newCols: cols, placementQuality: -50 };
+    }
+
+    function evaluateCardValue(card, currentCounts, roundNum, dna, bot, allPlayers, knownComingBackIds) {
+        let val = 0;
+        let roundsLeftToScore = 4 - roundNum;
+
+        if (card.color === 'blue') val += dna.blueVal * roundsLeftToScore * (roundNum === 1 ? dna.round1Focus * 0.4 : 0.8);
+        if (card.color === 'green') val += dna.greenVal * (roundNum >= 2 ? (4 - roundNum) * dna.round2Focus * 0.45 : 1.2);
+        if (card.color === 'gray') val += dna.grayVal * (roundNum === 3 ? dna.round3Focus * 0.7 : (roundNum === 2 ? 1.5 : 0.4));
+        if (card.color === 'pink') {
+            let nextPinkMarginalPts = currentCounts.pink + 1;
+            let phaseMult = roundNum === 3 ? dna.round3Focus * 0.6 : (roundNum === 2 ? 1.4 : 0.7);
+            val += (dna.pinkVal * 0.4 + nextPinkMarginalPts * 2.5) * phaseMult;
+        }
+
+        if (knownComingBackIds && knownComingBackIds.has(card.id)) {
+            val += 2;
+        }
+
+        if (allPlayers && allPlayers.length > 1) {
+            allPlayers.forEach(opp => {
+                if (opp === bot) return;
+                let oppCounts = { blue: 0, green: 0, gray: 0, pink: 0 };
+                opp.cols.forEach(col => col.forEach(c => oppCounts[c.color]++));
+
+                let oppCanFit = opp.cols.some(col => {
+                    if (col.length === 0) return true;
+                    let min = Math.min(col[0].id, col[col.length - 1].id);
+                    let max = Math.max(col[0].id, col[col.length - 1].id);
+                    return card.id < min || card.id > max;
+                });
+
+                if (oppCanFit) {
+                    let threat = 0;
+                    if (card.color === 'pink' && oppCounts.pink >= 2) threat = (oppCounts.pink + 1) * 3;
+                    else if (card.color === 'gray' && roundNum === 3) threat = 6;
+                    else if (card.color === 'green' && roundNum >= 2) threat = 3.5;
+                    else if (card.color === 'blue' && roundNum === 1) threat = 3;
+                    val += threat * (dna.denialWeight * 0.15);
+                }
+            });
+        }
+        return val;
+    }
+
+    function makeAIDecision(bot, hand, roundNum, allPlayers) {
+        let dna = bot.dna || AI_PERSONAS.medium.dna;
+        if (!bot.seenThisRound) bot.seenThisRound = new Set();
+
+        let currentCounts = { blue: 0, green: 0, gray: 0, pink: 0 };
+        bot.cols.forEach(col => col.forEach(card => currentCounts[card.color]++));
+
+        let spaceBefore = calculateRemainingPlayableSpace(bot.cols);
+        let turnsLeft = ((3 - roundNum) * 5) + (6 - currentTurn);
+
+        let bestPair = [hand[0], hand[1]];
+        let bestPairPlan = null;
+        let bestTotalScore = -99999;
+
+        for (let i = 0; i < hand.length; i++) {
+            for (let j = i + 1; j < hand.length; j++) {
+                let c1 = hand[i];
+                let c2 = hand[j];
+
+                let val1 = evaluateCardValue(c1, currentCounts, roundNum, dna, bot, allPlayers, bot.seenThisRound);
+                let val2 = evaluateCardValue(c2, currentCounts, roundNum, dna, bot, allPlayers, bot.seenThisRound);
+                let pairPinkSynergy = (c1.color === 'pink' && c2.color === 'pink') ? 4 : 0;
+
+                let plans = [];
+
+                let stepA1 = simulateCardPlacement(bot.cols, c1, roundNum, dna);
+                if (stepA1.valid) {
+                    let stepA2 = simulateCardPlacement(stepA1.newCols, c2, roundNum, dna);
+                    if (stepA2.valid) {
+                        plans.push({
+                            colsAfter: stepA2.newCols,
+                            score: val1 + val2 + pairPinkSynergy + stepA1.placementQuality + stepA2.placementQuality,
+                            placements: [c1, c2]
+                        });
+                    }
+                    plans.push({
+                        colsAfter: stepA1.newCols,
+                        score: val1 + (val2 * 0.25) + stepA1.placementQuality - (dna.discardWillpower * 0.5),
+                        placements: [c1]
+                    });
+                }
+
+                let stepB1 = simulateCardPlacement(bot.cols, c2, roundNum, dna);
+                if (stepB1.valid) {
+                    let stepB2 = simulateCardPlacement(stepB1.newCols, c1, roundNum, dna);
+                    if (stepB2.valid) {
+                        plans.push({
+                            colsAfter: stepB2.newCols,
+                            score: val1 + val2 + pairPinkSynergy + stepB1.placementQuality + stepB2.placementQuality,
+                            placements: [c2, c1]
+                        });
+                    }
+                    plans.push({
+                        colsAfter: stepB1.newCols,
+                        score: val2 + (val1 * 0.25) + stepB1.placementQuality - (dna.discardWillpower * 0.5),
+                        placements: [c2]
+                    });
+                }
+
+                plans.push({
+                    colsAfter: bot.cols,
+                    score: (val1 + val2) * 0.2 - (dna.discardWillpower * 2.5),
+                    placements: []
+                });
+
+                plans.forEach(plan => {
+                    let spaceAfter = calculateRemainingPlayableSpace(plan.colsAfter);
+                    let spaceBurned = spaceBefore - spaceAfter;
+                    let spacePenalty = (spaceBurned * turnsLeft * (dna.gapDiscipline * 0.035));
+                    let finalScore = plan.score - spacePenalty + (Math.random() * 0.15);
+
+                    if (finalScore > bestTotalScore) {
+                        bestTotalScore = finalScore;
+                        bestPair = [c1, c2];
+                        bestPairPlan = plan.placements;
+                    }
+                });
+            }
+        }
+
+        hand.forEach(c => {
+            if (!bestPair.includes(c)) bot.seenThisRound.add(c.id);
+        });
+
+        bot.plannedPlacements = bestPairPlan || [];
+        return bestPair;
+    }
+
+    /* --- SETUP & OPPONENT CONFIG UI --- */
+    function updateOpponentSlots(count) {
+        document.getElementById('num-opps-val').innerText = count;
+        let container = document.getElementById('opponent-slots-container');
+        container.innerHTML = '';
+        
+        for (let i = 1; i <= count; i++) {
+            container.innerHTML += `
+                <div class="ai-slot">
+                    <span><b>Bot ${i} Persona:</b></span>
+                    <select id="bot-persona-${i}">
+                        <option value="easy">Easy (EASY)</option>
+                        <option value="medium">Medium (MED)</option>
+                        <option value="hard" selected>Hard (GM)</option>
+                        <option value="custom" ${!uploadedCustomDna ? 'disabled' : ''}>Custom (CUST)</option>
+                    </select>
+                </div>`;
+        }
+    }
+
+    function loadCustomAIDNA(event) {
+        let file = event.target.files[0];
+        if (!file) return;
+        let reader = new FileReader();
+        reader.onload = function(e) {
+            try {
+                uploadedCustomDna = JSON.parse(e.target.result);
+                document.getElementById('loaded-dna-status').innerText = "Successfully loaded: " + file.name;
+                updateOpponentSlots(document.getElementById('num-opps-slider').value);
+            } catch(err) {
+                alert("Error parsing JSON file. Please ensure it's a valid master AI DNA export.");
+            }
+        };
+        reader.readAsText(file);
+    }
+
+    function showScreen(screenId) {
+        ['setup-screen', 'lab-screen', 'game-screen'].forEach(id => {
+            document.getElementById(id).classList.add('hidden');
+        });
+        document.getElementById(screenId).classList.remove('hidden');
+    }
+
+    function buildDeck() {
+        deck = [];
+        for (let i = 1; i <= 120; i++) deck.push({ id: i, color: COLORS[Math.floor(Math.random() * COLORS.length)] });
+        for (let i = deck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [deck[i], deck[j]] = [deck[j], deck[i]];
+        }
+    }
+
+    function startGame() {
+        let numOpps = parseInt(document.getElementById('num-opps-slider').value);
+        
+        currentRound = 1;
+        currentTurn = 1;
+        selectedDrafts = [];
+        cardsToPlace = [];
+        activePlaceCardIndex = 0;
+        viewingHistoricalGame = null;
+
+        document.getElementById('action-area').innerHTML = `
+            <h4 id="instruction-text">Select 2 cards to draft</h4>
+            <button id="action-btn" onclick="confirmDraft()" disabled>Confirm Draft</button>
+            <button id="discard-btn" onclick="discardCard()" class="hidden" style="background:#555;">Discard Card</button>
+        `;
+
+        showScreen('game-screen');
+        buildDeck();
+        
+        players = [{ name: 'You', shortName: 'YOU', isAI: false, hand: [], cols: [[], [], []], totalScore: 0, roundScores: [0,0,0], history: [], historySnapshots: [] }];
+        for (let i = 1; i <= numOpps; i++) {
+            let personaKey = document.getElementById(`bot-persona-${i}`).value;
+            let personaObj = AI_PERSONAS[personaKey] || AI_PERSONAS.hard;
+            let botDna = (personaKey === 'custom' && uploadedCustomDna) ? uploadedCustomDna : personaObj.dna;
+            let shortLabel = `${personaObj.label} ${i}`;
+
+            players.push({
+                name: shortLabel,
+                shortName: shortLabel,
+                isAI: true,
+                hand: [],
+                cols: [[], [], []],
+                totalScore: 0,
+                roundScores: [0,0,0],
+                history: [],
+                historySnapshots: [],
+                dna: botDna,
+                seenThisRound: new Set()
+            });
+        }
+        
+        buildOpponentUI();
+        startRound();
+    }
+
+    function startRound() {
+        if (currentRound > 3) { endGame(); return; }
+        currentTurn = 1;
+        players.forEach(p => {
+            p.hand = [];
+            if (p.seenThisRound) p.seenThisRound.clear();
+            for (let i = 0; i < 10; i++) p.hand.push(deck.pop());
+        });
+        updateUI();
+        startDraftPhase();
+    }
+
+    /* --- UI & RENDERERS --- */
+    function buildOpponentUI() {
+        const oppArea = document.getElementById('opponents-area');
+        oppArea.innerHTML = '';
+        for (let i = 1; i < players.length; i++) {
+            oppArea.innerHTML += `
+                <div class="player-board">
+                    <h4 style="font-size:11px;">${players[i].name}</h4>
+                    <div class="color-summary" id="summary-${i}"></div>
+                    <div class="columns-container" id="opp-cols-${i}">
+                        <div class="column"></div><div class="column"></div><div class="column"></div>
+                    </div>
+                </div>`;
+        }
+    }
+
+    function getColorCounts(player) {
+        let counts = { blue: 0, green: 0, gray: 0, pink: 0 };
+        player.cols.forEach(col => col.forEach(card => counts[card.color]++));
+        return counts;
+    }
+
+    function renderColumnContent(colCards, isMainPlayer) {
+        if (colCards.length === 0) return '';
+        let min = Math.min(colCards[0].id, colCards[colCards.length - 1].id);
+        let max = Math.max(colCards[0].id, colCards[colCards.length - 1].id);
+
+        let cardW = isMainPlayer ? 38 : 24;
+        let cardH = isMainPlayer ? 55 : 34;
+        let stackMaxH = isMainPlayer ? 110 : 75; 
+        
+        let n = colCards.length;
+        let spacing = 0;
+        if (n > 1) {
+            spacing = (stackMaxH - cardH) / (n - 1);
+            let maxSpacing = cardH * 0.45;
+            if (spacing > maxSpacing) spacing = maxSpacing;
+        }
+        let actualH = cardH + (n > 1 ? (n - 1) * spacing : 0);
+        let fontSize = isMainPlayer ? 14 : 11;
+
+        let html = `<div style="font-size:10px; font-weight:bold; background:#1e1e1e; color:#ccc; padding:1px 3px; border-radius:3px; z-index:5; box-shadow:0 1px 2px rgba(0,0,0,0.5);">⬇${min}</div>`;
+        html += `<div class="card-stack" style="height:${actualH}px; width:${cardW}px; margin: 3px 0;">`;
+        
+        colCards.forEach((card, idx) => {
+            let topPos = idx * spacing;
+            html += `<div class="card color-${card.color}" style="position:absolute; top:${topPos}px; width:100%; height:${cardH}px; font-size:${fontSize}px;">${card.id}</div>`;
+        });
+        
+        html += `</div>`;
+        html += `<div style="font-size:10px; font-weight:bold; background:#1e1e1e; color:#ccc; padding:1px 3px; border-radius:3px; z-index:5; box-shadow:0 1px 2px rgba(0,0,0,0.5);">⬆${max}</div>`;
+        return html;
+    }
+
+    function updateUI() {
+        document.getElementById('round-indicator').innerText = `${currentRound}/3`;
+        document.getElementById('turn-indicator').innerText = `${currentTurn}/5`;
+        document.getElementById('score-board').innerHTML = players.map(p => `<b>${p.shortName}:</b> ${p.totalScore}`).join(' | ');
+
+        players.forEach((p, index) => {
+            let c = getColorCounts(p);
+            document.getElementById(`summary-${index}`).innerHTML = `
+                <div class="summary-pill color-blue">${c.blue}</div>
+                <div class="summary-pill color-green">${c.green}</div>
+                <div class="summary-pill color-gray">${c.gray}</div>
+                <div class="summary-pill color-pink">${c.pink}</div>
+            `;
+        });
+
+        const handArea = document.getElementById('hand-area');
+        handArea.innerHTML = '';
+        if (players[0].hand.length > 0 && cardsToPlace.length === 0) {
+            players[0].hand.sort((a, b) => a.id - b.id).forEach((card) => {
+                let div = document.createElement('div');
+                div.className = `card in-hand color-${card.color}`;
+                div.innerText = card.id;
+                div.onclick = () => toggleCardSelection(card.id, div);
+                handArea.appendChild(div);
+            });
+        }
+
+        for (let c = 0; c < 3; c++) document.getElementById(`col-${c}`).innerHTML = renderColumnContent(players[0].cols[c], true);
+        for (let p = 1; p < players.length; p++) {
+            for (let c = 0; c < 3; c++) document.getElementById(`opp-cols-${p}`).children[c].innerHTML = renderColumnContent(players[p].cols[c], false);
+        }
+    }
+
+    /* --- GAME PHASES --- */
+    function startDraftPhase() {
+        selectedDrafts = [];
+        document.getElementById('instruction-text').innerText = "Select 2 cards to draft";
+        let btn = document.getElementById('action-btn');
+        btn.innerText = "Confirm Draft"; btn.disabled = true; btn.classList.remove('hidden');
+        document.getElementById('discard-btn').classList.add('hidden');
+        document.querySelectorAll('#player-cols .column').forEach(c => c.classList.remove('active-target'));
+        updateUI();
+    }
+
+    function toggleCardSelection(id, el) {
+        if (cardsToPlace.length > 0) return;
+        let idx = selectedDrafts.indexOf(id);
+        if (idx > -1) { selectedDrafts.splice(idx, 1); el.classList.remove('selected'); }
+        else if (selectedDrafts.length < 2) { selectedDrafts.push(id); el.classList.add('selected'); }
+        document.getElementById('action-btn').disabled = (selectedDrafts.length !== 2);
+    }
+
+    function confirmDraft() {
+        cardsToPlace = players[0].hand.filter(c => selectedDrafts.includes(c.id));
+        players[0].hand = players[0].hand.filter(c => !selectedDrafts.includes(c.id));
+        activePlaceCardIndex = 0;
+        
+        for (let i = 1; i < players.length; i++) {
+            players[i].drafted = makeAIDecision(players[i], players[i].hand, currentRound, players);
+            players[i].hand = players[i].hand.filter(c => !players[i].drafted.includes(c));
+        }
+        startPlacePhase();
+    }
+
+    function selectPlaceCard(index) {
+        if (cardsToPlace.length <= index) return;
+        activePlaceCardIndex = index;
+        startPlacePhase();
+    }
+
+    function startPlacePhase() {
+        document.getElementById('hand-area').innerHTML = ''; 
+        cardsToPlace.forEach((card, index) => {
+            let isSel = (index === activePlaceCardIndex) ? 'selected' : '';
+            document.getElementById('hand-area').innerHTML += `<div class="card in-hand color-${card.color} ${isSel}" onclick="selectPlaceCard(${index})">${card.id}</div>`;
+        });
+
+        if (cardsToPlace.length > 0) {
+            let card = cardsToPlace[activePlaceCardIndex];
+            document.getElementById('instruction-text').innerText = `Place [${card.id}]. Tap valid column or Discard.`;
+            document.getElementById('action-btn').classList.add('hidden');
+            document.getElementById('discard-btn').classList.remove('hidden');
+            
+            let cols = players[0].cols;
+            for (let i = 0; i < 3; i++) {
+                let colDiv = document.getElementById(`col-${i}`);
+                if (cols[i].length === 0 || card.id < Math.min(cols[i][0].id, cols[i][cols[i].length-1].id) || card.id > Math.max(cols[i][0].id, cols[i][cols[i].length-1].id)) {
+                    colDiv.classList.add('active-target');
+                } else colDiv.classList.remove('active-target');
+            }
+        } else {
+            resolveAIs(); passHands();
+        }
+    }
+
+    function placeCardInColumn(colIndex) {
+        if (cardsToPlace.length === 0) return;
+        let card = cardsToPlace[activePlaceCardIndex];
+        let col = players[0].cols[colIndex];
+        
+        let min = col.length ? Math.min(col[0].id, col[col.length-1].id) : -1;
+        let max = col.length ? Math.max(col[0].id, col[col.length-1].id) : 999;
+        
+        if (col.length === 0 || card.id < min || card.id > max) {
+            if (col.length === 0 || card.id > max) col.push(card);
+            else col.unshift(card);
+            cardsToPlace.splice(activePlaceCardIndex, 1);
+            activePlaceCardIndex = 0; 
+            updateUI(); startPlacePhase();
+        } else alert("Invalid placement!");
+    }
+
+    function discardCard() {
+        if (cardsToPlace.length === 0) return;
+        cardsToPlace.splice(activePlaceCardIndex, 1);
+        activePlaceCardIndex = 0; 
+        updateUI(); startPlacePhase();
+    }
+
+    function resolveAIs() {
+        for (let i = 1; i < players.length; i++) {
+            let p = players[i];
+            let cardsToPlay = p.plannedPlacements || p.drafted;
+            cardsToPlay.forEach(card => {
+                let sim = simulateCardPlacement(p.cols, card, currentRound, p.dna || AI_PERSONAS.hard.dna);
+                if (sim.valid) {
+                    p.cols = sim.newCols;
+                }
+            });
+            delete p.drafted;
+            delete p.plannedPlacements;
+        }
+    }
+
+    function passHands() {
+        if (currentTurn >= 5) {
+            scoreRound();
+            if (currentRound < 3) {
+                currentRound++;
+                startRound();
+            } else {
+                endGame();
+            }
+        } else {
+            let tempHands = players.map(p => p.hand);
+            if (currentRound === 2) for (let i = 0; i < players.length; i++) players[(i + 1) % players.length].hand = tempHands[i];
+            else for (let i = 0; i < players.length; i++) players[i].hand = tempHands[(i + 1) % players.length];
+            currentTurn++; startDraftPhase();
+        }
+    }
+
+    function calculateRoundScoresForPlayer(player, roundNum) {
+        let counts = { blue: 0, green: 0, gray: 0, pink: 0 };
+        player.cols.forEach(col => col.forEach(card => counts[card.color]++));
+
+        let bp = counts.blue * 3;
+        let gp = roundNum >= 2 ? counts.green * 4 : 0;
+        let grp = roundNum === 3 ? counts.gray * 7 : 0;
+        
+        let pinkPts = 0;
+        if (roundNum === 3) {
+            let pCount = counts.pink;
+            if (pCount >= 15) pinkPts = 120;
+            else {
+                for (let k = 1; k <= pCount; k++) pinkPts += k;
+            }
+        }
+
+        let colours = {
+            blue: { count: counts.blue, points: bp },
+            green: { count: counts.green, points: gp },
+            gray: { count: counts.gray, points: grp },
+            pink: { count: counts.pink, points: pinkPts }
+        };
+
+        let roundTotal = bp + gp + grp + pinkPts;
+        return { counts, colours, roundTotal };
+    }
+
+    function scoreRound() {
+        players.forEach(p => {
+            let res = calculateRoundScoresForPlayer(p, currentRound);
+            p.roundScores[currentRound - 1] = res.roundTotal;
+            p.totalScore = p.roundScores.reduce((a, b) => a + b, 0);
+            
+            if (!p.historySnapshots) p.historySnapshots = [];
+            p.historySnapshots[currentRound - 1] = {
+                cols: JSON.parse(JSON.stringify(p.cols)),
+                colours: res.colours,
+                roundTotal: res.roundTotal,
+                cumulativeTotal: p.totalScore
+            };
+        });
+        updateUI();
+    }
+
+    /* --- SIMULATION LAB ENGINE --- */
+    let simInterval = null;
+    let simData = { generation: 0, bestScoreAllTime: 0, population: [], bestBotDna: null, totalSimGames: 0, tournamentWins: 0 };
+
+    function startSimulation() {
+        let popSize = parseInt(document.getElementById('pop-slider').value);
+        let mutationRate = parseInt(document.getElementById('mut-slider').value);
+        
+        if (simData.population.length === 0) {
+            simData.generation = 0; simData.bestScoreAllTime = 0; simData.totalSimGames = 0; simData.tournamentWins = 0;
+            for (let i = 0; i < popSize; i++) simData.population.push({ dna: createComplexDNA(), fitness: 0, maxGameScore: 0 });
+        }
+
+        document.getElementById('lab-start-btn').disabled = true;
+        document.getElementById('lab-pause-btn').disabled = false;
+
+        simInterval = setInterval(() => { runGenerationStep(popSize, mutationRate); }, 40);
+    }
+
+    function pauseSimulation() {
+        clearInterval(simInterval);
+        document.getElementById('lab-start-btn').disabled = false;
+        document.getElementById('lab-pause-btn').disabled = true;
+    }
+
+    function runSimulationMatch(bot1, bot2) {
+        let b1 = { dna: bot1.dna, cols: [[], [], []], totalScore: 0, roundScores: [0,0,0], seenThisRound: new Set() };
+        let b2 = { dna: bot2.dna, cols: [[], [], []], totalScore: 0, roundScores: [0,0,0], seenThisRound: new Set() };
+        let simDeck = [];
+        for (let i = 1; i <= 120; i++) simDeck.push({ id: i, color: COLORS[Math.floor(Math.random() * COLORS.length)] });
+        for (let i = simDeck.length - 1; i > 0; i--) {
+            const j = Math.floor(Math.random() * (i + 1));
+            [simDeck[i], simDeck[j]] = [simDeck[j], simDeck[i]];
+        }
+
+        for (let r = 1; r <= 3; r++) {
+            b1.hand = []; b2.hand = [];
+            b1.seenThisRound.clear(); b2.seenThisRound.clear();
+            for (let i = 0; i < 10; i++) { b1.hand.push(simDeck.pop()); b2.hand.push(simDeck.pop()); }
+            
+            for (let t = 1; t <= 5; t++) {
+                let d1 = makeAIDecision(b1, b1.hand, r, [b1, b2]);
+                b1.hand = b1.hand.filter(c => !d1.includes(c));
+                let d2 = makeAIDecision(b2, b2.hand, r, [b1, b2]);
+                b2.hand = b2.hand.filter(c => !d2.includes(c));
+
+                [b1, b2].forEach(bot => {
+                    (bot.plannedPlacements || []).forEach(card => {
+                        let sim = simulateCardPlacement(bot.cols, card, r, bot.dna);
+                        if (sim.valid) bot.cols = sim.newCols;
+                    });
+                });
+                let tmp = b1.hand; b1.hand = b2.hand; b2.hand = tmp;
+            }
+
+            [b1, b2].forEach(bot => {
+                let res = calculateRoundScoresForPlayer(bot, r);
+                bot.totalScore += res.roundTotal;
+            });
+        }
+        return b1.totalScore >= b2.totalScore ? b1 : b2;
+    }
+
+    function runGenerationStep(popSize, mutRate) {
+        simData.generation++;
+        simData.totalSimGames += popSize;
+        simData.population.forEach(ind => {
+            ind.fitness = 0;
+            if (ind.maxGameScore === undefined) ind.maxGameScore = 0;
+        });
+
+        simData.population.forEach(ind => {
+            for (let m = 0; m < 3; m++) {
+                let opp = simData.population[Math.floor(Math.random() * popSize)];
+                let res = runSimulationMatch({ dna: ind.dna }, { dna: opp.dna });
+                
+                if (res.totalScore > ind.maxGameScore) ind.maxGameScore = res.totalScore;
+
+                if (res.dna === ind.dna) {
+                    ind.fitness += res.totalScore + 20;
+                    if (ind === simData.population[0]) simData.tournamentWins++;
+                } else {
+                    ind.fitness += (res.totalScore * 0.5);
+                }
+            }
+        });
+
+        simData.population.sort((a, b) => b.fitness - a.fitness);
+        let bestOfGen = simData.population[0];
+        
+        if (bestOfGen.maxGameScore > simData.bestScoreAllTime) {
+            simData.bestScoreAllTime = bestOfGen.maxGameScore;
+            simData.bestBotDna = JSON.parse(JSON.stringify(bestOfGen.dna));
+        }
+
+        let newPop = [];
+        let eliteCount = Math.max(2, Math.floor(popSize * 0.25));
+        for (let i = 0; i < eliteCount; i++) newPop.push(simData.population[i]);
+
+        while (newPop.length < popSize) {
+            let parent1 = simData.population[Math.floor(Math.random() * eliteCount)];
+            let parent2 = simData.population[Math.floor(Math.random() * eliteCount)];
+            let childDna = crossoverDNA(parent1.dna, parent2.dna);
+            childDna = mutateDNA(childDna, mutRate);
+            newPop.push({ dna: childDna, fitness: 0, maxGameScore: 0 });
+        }
+        simData.population = newPop;
+
+        document.getElementById('lab-gen').innerText = simData.generation;
+        document.getElementById('lab-best').innerText = simData.bestScoreAllTime;
+        document.getElementById('lab-avg').innerText = Math.round(simData.population.reduce((sum, p) => sum + p.fitness, 0) / popSize);
+        document.getElementById('lab-top-win').innerText = Math.min(99, Math.round((simData.tournamentWins / (simData.totalSimGames || 1)) * 100)) + '%';
+    }
+
+    function exportBestAI() {
+        if (!simData.bestBotDna) { alert("Run simulation for at least a few generations first!"); return; }
+        let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(simData.bestBotDna, null, 2));
+        let dlAnchor = document.createElement('a');
+        dlAnchor.setAttribute("href", dataStr);
+        dlAnchor.setAttribute("download", "ohanami_grandmaster_dna.json");
+        document.body.appendChild(dlAnchor);
+        dlAnchor.click();
+        dlAnchor.remove();
+    }
+
+    /* --- STATS & STORAGE --- */
+    function getStoredStats() {
+        return JSON.parse(localStorage.getItem('ohanami_stats')) || { gamesPlayed: 0, wins: 0, totalScore: 0, highScore: 0, cardsPlayed: { blue: 0, green: 0, gray: 0, pink: 0 } };
+    }
+    function getStoredHistory() { return JSON.parse(localStorage.getItem('ohanami_history')) || []; }
+    
+    function recordGameEnd(winner, userRankStr) {
+        let user = players[0];
+        let stats = getStoredStats();
+        let history = getStoredHistory();
+
+        stats.gamesPlayed++;
+        if (winner.name === user.name) stats.wins++;
+        stats.totalScore += user.totalScore;
+        if (user.totalScore > stats.highScore) stats.highScore = user.totalScore;
+
+        let userCounts = getColorCounts(user);
+        stats.cardsPlayed.blue += userCounts.blue; stats.cardsPlayed.green += userCounts.green;
+        stats.cardsPlayed.gray += userCounts.gray; stats.cardsPlayed.pink += userCounts.pink;
+
+        localStorage.setItem('ohanami_stats', JSON.stringify(stats));
+        
+        let matchSnapshot = {
+            date: new Date().toLocaleDateString() + ' ' + new Date().toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}),
+            players: JSON.parse(JSON.stringify(players)),
+            numPlayers: players.length,
+            userScore: user.totalScore,
+            userRankStr: userRankStr,
+            winnerName: winner.name,
+            gameComplete: true
+        };
+
+        history.unshift(matchSnapshot);
+        if (history.length > 20) history.pop();
+        localStorage.setItem('ohanami_history', JSON.stringify(history));
+    }
+
+    function clearHistory() {
+        if (confirm("Reset statistics and match history?")) {
+            localStorage.removeItem('ohanami_stats'); localStorage.removeItem('ohanami_history');
+            renderStatsTab(); renderHistoryTab();
+        }
+    }
+
+    /* --- MODALS --- */
+    function openModal(defaultTab = 'scorecard') {
+        document.getElementById('app-modal').classList.remove('hidden');
+        switchTab(defaultTab);
+    }
+    function closeModal() { 
+        document.getElementById('app-modal').classList.add('hidden');
+        viewingHistoricalGame = null;
+    }
+
+    function switchTab(tab) {
+        ['scorecard', 'stats', 'history'].forEach(t => {
+            document.getElementById(`tab-${t}`).classList.add('hidden');
+            document.getElementById(`tab-${t}-btn`).classList.remove('active');
+        });
+        document.getElementById(`tab-${tab}`).classList.remove('hidden');
+        document.getElementById(`tab-${tab}-btn`).classList.add('active');
+
+        if (tab === 'scorecard') renderScorecardTab();
+        if (tab === 'stats') renderStatsTab();
+        if (tab === 'history') renderHistoryTab();
+    }
+
+    function getOrdinalSuffix(n) {
+        let s = ["th", "st", "nd", "rd"], v = n % 100;
+        return n + (s[(v - 20) % 10] || s[v] || s[0]);
+    }
+
+    function calculateRankings(playerScores) {
+        let sorted = [...playerScores].sort((a, b) => b.score - a.score);
+        let ranks = new Map();
+        let currentRank = 1;
+        
+        for (let i = 0; i < sorted.length; i++) {
+            if (i > 0 && sorted[i].score < sorted[i-1].score) {
+                currentRank = i + 1;
+            }
+            ranks.set(sorted[i].player.name, currentRank);
+        }
+        return ranks;
+    }
+
+    function renderScorecardTab() {
+        let activePlayers = viewingHistoricalGame ? viewingHistoricalGame.players : players;
+        let isFinal = viewingHistoricalGame ? viewingHistoricalGame.gameComplete : (currentRound > 3);
+        
+        let maxRoundToDisplay = viewingHistoricalGame ? 3 : (isFinal ? 3 : currentRound);
+        let allColorsOn = document.getElementById('all-colors-toggle') ? document.getElementById('all-colors-toggle').checked : true;
+        let numColsGrid = activePlayers.length;
+
+        let html = `
+            <div class="sc-header">
+                <h3 class="sc-title">Ohanami Scorecard</h3>
+                ${isFinal ? '<span class="sc-badge-final">Final</span>' : ''}
+            </div>
+            <div class="sc-controls">
+                <span>All colours</span>
+                <label class="toggle-switch">
+                    <input type="checkbox" id="all-colors-toggle" ${allColorsOn ? 'checked' : ''} onchange="renderScorecardTab()">
+                    <span class="toggle-slider"></span>
+                </label>
+            </div>
+            <div class="sc-grid-table" style="grid-template-columns: 75px repeat(${numColsGrid}, 1fr);">
+                <div></div>
+        `;
+
+        activePlayers.forEach(p => {
+            let headerLabel = p.shortName || p.name;
+            html += `<div class="sc-col-header">${headerLabel}</div>`;
+        });
+
+        const colorMeta = [
+            { id: 'blue', name: 'Blue' },
+            { id: 'green', name: 'Green' },
+            { id: 'gray', name: 'Gray' },
+            { id: 'pink', name: 'Pink' }
+        ];
+
+        let cumulativeScores = activePlayers.map(() => 0);
+
+        for (let r = 1; r <= maxRoundToDisplay; r++) {
+            let subtitle = r === 1 ? 'Blue scoring' : (r === 2 ? 'Blue + green scoring' : 'All colours scoring');
+            html += `
+                <div class="sc-round-title" style="grid-column: span ${numColsGrid + 1};">
+                    <span>Round ${r}</span>
+                    <span class="sc-round-subtitle">${subtitle}</span>
+                </div>
+            `;
+
+            let isRoundCompleted = viewingHistoricalGame || r < currentRound || isFinal;
+
+            colorMeta.forEach(col => {
+                let isScoringRound = (r === 1 && col.id === 'blue') || 
+                                     (r === 2 && (col.id === 'blue' || col.id === 'green')) || 
+                                     (r === 3);
+
+                let showRow = allColorsOn || isScoringRound;
+                if (!showRow) return;
+
+                html += `
+                    <div class="sc-row-label">
+                        <div class="sc-color-bar bar-${col.id}-${isScoringRound ? 'active' : 'inactive'}"></div>
+                        <span>${col.name}</span>
+                    </div>
+                `;
+
+                activePlayers.forEach((p, pIdx) => {
+                    let cData, ptsVal;
+                    if (isRoundCompleted && p.historySnapshots && p.historySnapshots[r-1]) {
+                        cData = p.historySnapshots[r-1].colours[col.id];
+                        ptsVal = isScoringRound ? cData.points : 0;
+                    } else {
+                        let liveRes = calculateRoundScoresForPlayer(p, r);
+                        cData = liveRes.colours[col.id];
+                        ptsVal = isScoringRound ? cData.points : 0;
+                    }
+                    html += `
+                        <div class="sc-cell cell-${col.id}-${isScoringRound ? 'active' : 'inactive'}">
+                            <span class="sc-cell-count">${cData.count}</span>
+                            <span class="sc-cell-pts">${ptsVal} pts</span>
+                        </div>
+                    `;
+                });
+            });
+
+            html += `<div class="sc-round-total-row" style="grid-column: span ${numColsGrid + 1}; grid-template-columns: 75px repeat(${numColsGrid}, 1fr);"><div class="sc-round-total-label">ROUND<br>(Game)</div>`;
+            
+            activePlayers.forEach((p, pIdx) => {
+                let rScore, cScore;
+                if (isRoundCompleted && p.historySnapshots && p.historySnapshots[r-1]) {
+                    rScore = p.historySnapshots[r-1].roundTotal;
+                } else {
+                    let liveRes = calculateRoundScoresForPlayer(p, r);
+                    rScore = liveRes.roundTotal;
+                }
+                cumulativeScores[pIdx] += rScore;
+                cScore = cumulativeScores[pIdx];
+
+                html += `
+                    <div class="sc-round-total-val">
+                        <span class="sc-rt-score">${rScore}</span>
+                        <span class="sc-rt-cumul">(${cScore})</span>
+                    </div>
+                `;
+            });
+            html += `</div>`;
+        }
+
+        let finalScoresArr = activePlayers.map((p, pIdx) => ({ player: p, score: cumulativeScores[pIdx] }));
+        let ranksMap = calculateRankings(finalScoresArr);
+
+        html += `</div>
+            <div class="sc-final-panel">
+                <div class="sc-final-header">
+                    <span>${isFinal ? 'Final game totals' : `Current game totals (Round ${currentRound} live)`}</span>
+                    <span>${isFinal ? '🏆' : '📊'}</span>
+                </div>
+                <div class="sc-final-grid" style="grid-template-columns: repeat(${numColsGrid}, 1fr);">
+        `;
+
+        activePlayers.forEach((p, pIdx) => {
+            let score = cumulativeScores[pIdx];
+            let rank = ranksMap.get(p.name);
+            let rankStr = rank === 1 ? '1st place' : (rank === 2 ? '2nd place' : (rank === 3 ? '3rd place' : '4th place'));
+            let isWinner = rank === 1 && isFinal;
+            
+            if (isWinner) {
+                rankStr = '🏆 Winner';
+            }
+
+            let rankClass = rank === 1 ? 'winner' : '';
+
+            html += `
+                <div class="sc-final-col">
+                    <div class="sc-final-name">${p.name}</div>
+                    <div class="sc-final-score">${score}</div>
+                    <div class="sc-final-rank ${rankClass}">${rankStr}</div>
+                </div>
+            `;
+        });
+
+        html += `</div></div>`;
+        document.getElementById('scorecard-content').innerHTML = html;
+    }
+
+    function renderStatsTab() {
+        let stats = getStoredStats();
+        let winRate = stats.gamesPlayed > 0 ? Math.round((stats.wins / stats.gamesPlayed) * 100) : 0;
+        let avgScore = stats.gamesPlayed > 0 ? Math.round(stats.totalScore / stats.gamesPlayed) : 0;
+        document.getElementById('stats-content').innerHTML = `
+            <div class="stats-grid" style="margin-top:10px;">
+                <div class="stat-card"><div class="val">${stats.gamesPlayed}</div><div class="lbl">Games Played</div></div>
+                <div class="stat-card"><div class="val">${winRate}%</div><div class="lbl">Win Rate (${stats.wins} wins)</div></div>
+                <div class="stat-card"><div class="val">${stats.highScore}</div><div class="lbl">High Score</div></div>
+                <div class="stat-card"><div class="val">${avgScore}</div><div class="lbl">Average Score</div></div>
+            </div>`;
+    }
+
+    function renderHistoryTab() {
+        let history = getStoredHistory();
+        if (history.length === 0) {
+            document.getElementById('history-content').innerHTML = "<p style='text-align:center; color:#888; margin-top:20px;'>No past game history available.</p>";
+            return;
+        }
+        let html = '';
+        history.forEach((h, idx) => {
+            let userObj = h.players[0];
+            let finalScores = h.players.map(p => ({ player: p, score: p.totalScore }));
+            let ranksMap = calculateRankings(finalScores);
+            let userRank = ranksMap.get(userObj.name);
+            let rankSuffix = getOrdinalSuffix(userRank);
+
+            html += `
+                <div class="history-item" onclick="viewHistoricalMatch(${idx})">
+                    <div>
+                        <div style="font-weight:bold; color:#fff;">${h.date} (${h.numPlayers} Players)</div>
+                        <div style="font-size:11px; color:#aaa; margin-top:2px;">Winner: ${h.winnerName}</div>
+                    </div>
+                    <div style="text-align:right;">
+                        <div style="font-size:14px; font-weight:bold; color:#2196F3;">${h.userScore} pts</div>
+                        <div style="font-size:11px; font-weight:bold; color:#81c784;">(${rankSuffix})</div>
+                    </div>
+                </div>
+            `;
+        });
+        document.getElementById('history-content').innerHTML = html;
+    }
+
+    function exportHistoryJSON() {
+        let history = getStoredHistory();
+        if (history.length === 0) {
+            alert("No match history to export!");
+            return;
+        }
+        let dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(history, null, 2));
+        let dlAnchor = document.createElement('a');
+        dlAnchor.setAttribute("href", dataStr);
+        dlAnchor.setAttribute("download", "ohanami_match_history.json");
+        document.body.appendChild(dlAnchor);
+        dlAnchor.click();
+        dlAnchor.remove();
+    }
+
+    function viewHistoricalMatch(index) {
+        let history = getStoredHistory();
+        if (history[index]) {
+            viewingHistoricalGame = history[index];
+            openModal('scorecard');
+        }
+    }
+
+    function endGame() {
+        currentRound = 4; // Mark game as finished
+        let winner = players.reduce((prev, curr) => (curr.totalScore > prev.totalScore) ? curr : prev);
+        let finalScores = players.map(p => ({ player: p, score: p.totalScore }));
+        let ranksMap = calculateRankings(finalScores);
+        let userRank = ranksMap.get(players[0].name);
+        let userRankStr = getOrdinalSuffix(userRank);
+
+        recordGameEnd(winner, userRankStr);
+        document.getElementById('action-area').innerHTML = "<h3>Game Over!</h3>";
+        document.getElementById('hand-area').innerHTML = `
+            <div style="text-align:center; width:100%;">
+                <h3 style="margin:0;">🏆 ${winner.name} Wins! (${winner.totalScore} pts)</h3>
+                <button onclick="showScreen('setup-screen')" style="margin-top:10px;">Back to Menu</button>
+            </div>`;
+        openModal('scorecard'); 
+    }
+
+    window.onload = function() {
+        updateOpponentSlots(1);
+    };
+</script>
+<script>
+  // 1. Register Service Worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('./sw.js').catch(err => {
+      console.warn('Service worker registration failed:', err);
+    });
+  });
+}
+
+// 2. Handle In-App PWA Install Prompt
+let deferredPrompt;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  // Prevent Chrome's default mini-infobar from automatically appearing
+  e.preventDefault();
+  deferredPrompt = e;
+
+  // Show a custom "Install App" button in your UI if present
+  const installBtn = document.getElementById('btn-install-app');
+  if (installBtn) {
+    installBtn.classList.remove('hidden');
+    installBtn.addEventListener('click', async () => {
+      if (!deferredPrompt) return;
+      deferredPrompt.prompt();
+      const { outcome } = await deferredPrompt.userChoice;
+      console.log(`User response to install prompt: ${outcome}`);
+      deferredPrompt = null;
+      installBtn.classList.add('hidden');
+    });
+  }
+});
+
+// Hide button once app is successfully installed
+window.addEventListener('appinstalled', () => {
+  console.log('Wealth Tracker was installed');
+  const installBtn = document.getElementById('btn-install-app');
+  if (installBtn) installBtn.classList.add('hidden');
+});
+</script>
+</body>
+</html>
